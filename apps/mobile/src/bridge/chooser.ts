@@ -1,7 +1,7 @@
 import { Linking, Platform } from 'react-native';
 import * as IntentLauncher from 'expo-intent-launcher';
 import type { BrowserId } from '@browse-router/shared';
-import { appendLog } from '../store/log.js';
+import { appendLog } from '../store/log';
 
 export interface LaunchResult {
   ok: boolean;
