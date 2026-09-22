@@ -120,7 +120,16 @@ jobs:
 
       - name: Assemble release APK (debug-signed)
         working-directory: apps/mobile/android
-        run: ./gradlew assembleRelease
+        # Force node onto PATH and also pass it explicitly via gradle's JVM
+        # args so the daemon (which spawns its own JVM) sees it. Then sanity-
+        # check what `node` resolves to before invoking gradle.
+        run: |
+          export PATH="/home/runner/.nvm/versions/node/v20.20.2/bin:/home/runner/setup-pnpm/node_modules/.bin:$PATH"
+          echo "node: $(which node || echo NOT FOUND)"
+          echo "PATH: $PATH"
+          ./gradlew --stop 2>/dev/null || true
+          ./gradlew assembleRelease \
+            -Dorg.gradle.jvmargs="-Dorg.gradle.daemon=false"
 
       - name: Locate APK
         id: locate
