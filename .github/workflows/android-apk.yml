@@ -1,15 +1,14 @@
 name: Android APK
 
+# Builds only on version tags (vX.Y.Z). Manual dispatch is intentionally
+# disabled to avoid burning GitHub Actions minutes on accidental triggers.
+# To cut a release:
+#   git tag v0.1.0 && git push --tags
+
 on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: 'Git ref to build (branch, tag, or SHA). Defaults to the workflow ref.'
-        required: false
-        default: ''
 
 permissions:
   contents: write   # needed to create GitHub Releases on tag pushes
@@ -28,9 +27,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # When dispatched with a custom ref, check that out instead of the tag.
-          ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
