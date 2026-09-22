@@ -83,8 +83,8 @@ jobs:
 
           # Install the platforms + build-tools we need (matches app.json).
           sdkmanager \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
             "platform-tools"
 
       - name: Cache Gradle
