@@ -1,0 +1,133 @@
+name: Android APK
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to build (branch, tag, or SHA). Defaults to the workflow ref.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # needed to create GitHub Releases on tag pushes
+  actions: read
+
+jobs:
+  build-apk:
+    name: Build sideloadable APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Disable Expo telemetry in CI
+      EXPO_NO_TELEMETRY: '1'
+      CI: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # When dispatched with a custom ref, check that out instead of the tag.
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Match the build properties in apps/mobile/app.json
+          api-level: '35'
+          build-tools-version: '35.0.0'
+          # ND not needed for a stock Expo build.
+          ndk: ''
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            apps/mobile/android/.gradle
+            apps/mobile/android/app/build
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties', 'apps/mobile/android/build.gradle', 'apps/mobile/android/app/build.gradle') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build engine + shared packages
+        run: pnpm -r --filter './packages/*' build
+
+      - name: Generate native android/ tree (prebuild)
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Make Gradle wrapper executable
+        working-directory: apps/mobile/android
+        run: chmod +x ./gradlew
+
+      - name: Assemble release APK (debug-signed)
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease
+        env:
+          # expo prebuild generates a debug keystore at android/app/debug.keystore;
+          # we use that for sideload. Replace these with a real release keystore
+          # stored as secrets before any Play Store submission.
+          EXPO_DEBUG_URL: ''
+
+      - name: Locate APK
+        id: locate
+        run: |
+          APK=$(find apps/mobile/android/app/build/outputs/apk/release -name '*.apk' | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "::error::No APK produced"
+            exit 1
+          fi
+          echo "apk_path=$APK" >> "$GITHUB_OUTPUT"
+          echo "Found APK: $APK"
+
+      - name: Rename APK
+        id: rename
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            NAME="browse-router-v${VERSION}.apk"
+          else
+            NAME="browse-router-debug-$(date -u +%Y-%m-%d).apk"
+          fi
+          cp "${{ steps.locate.outputs.apk_path }}" "$NAME"
+          echo "artifact_name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.rename.outputs.artifact_name }}
+          path: ${{ steps.rename.outputs.artifact_name }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.rename.outputs.artifact_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
