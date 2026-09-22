@@ -54,12 +54,29 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-        with:
-          # Match the build properties in apps/mobile/app.json
-          api-level: '35'
-          build-tools-version: '35.0.0'
+      - name: Setup Android SDK (manual)
+        run: |
+          set -e
+          # android-actions/setup-android is unmaintained and broken on the
+          # current GitHub runner image (fails to install the `tools` package
+          # from cmdline-tools). Install the SDK manually with sdkmanager.
+          ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
+
+          # Accept all SDK licenses non-interactively.
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+
+          # Install the platforms + build-tools we need (matches app.json).
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "platform-tools" \
+            "cmdline-tools;latest"
+
+          # Expose ANDROID_HOME for Gradle.
+          echo "ANDROID_HOME=${ANDROID_SDK_ROOT}" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}" >> "$GITHUB_ENV"
 
       - name: Cache Gradle
         uses: actions/cache@v4
