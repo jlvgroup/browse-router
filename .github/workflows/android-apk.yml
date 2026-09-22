@@ -116,6 +116,13 @@ jobs:
       - name: Assemble release APK (debug-signed)
         working-directory: apps/mobile/android
         run: ./gradlew assembleRelease
+        env:
+          # The expo prebuild app/build.gradle shells out to `node` to resolve
+          # paths (entryFile, reactNativeDir, codegenDir). Make sure node is on
+          # PATH — otherwise Gradle dies with "Cannot convert '' to File".
+          # We point at the runner's node install plus the pnpm-managed bin dir.
+          NODE_BIN: /home/runner/.nvm/versions/node/v20.20.2/bin
+          PATH: /home/runner/.nvm/versions/node/v20.20.2/bin:/home/runner/setup-pnpm/node_modules/.bin:$PATH
 
       - name: Locate APK
         id: locate
