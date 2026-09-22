@@ -120,7 +120,8 @@ jobs:
           # expo prebuild generates a debug keystore at android/app/debug.keystore;
           # we use that for sideload. Replace these with a real release keystore
           # stored as secrets before any Play Store submission.
-          EXPO_DEBUG_URL: ''
+          # NOTE: Do NOT set EXPO_DEBUG_URL here — an empty value causes
+          # "Cannot convert '' to File" in the generated app/build.gradle.
 
       - name: Locate APK
         id: locate
