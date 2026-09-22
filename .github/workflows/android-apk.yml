@@ -24,6 +24,11 @@ jobs:
       # Disable Expo telemetry in CI
       EXPO_NO_TELEMETRY: '1'
       CI: '1'
+      # Prepend the runner's node binary location. The expo-generated
+      # app/build.gradle shells out to `node` via Groovy's execute(), which
+      # reads PATH from the JVM environment — not the shell. Setting PATH
+      # at job-level env makes it visible to the gradle daemon.
+      PATH: "/home/runner/.nvm/versions/node/v20.20.2/bin:/home/runner/setup-pnpm/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
     steps:
       - name: Checkout
@@ -115,13 +120,7 @@ jobs:
 
       - name: Assemble release APK (debug-signed)
         working-directory: apps/mobile/android
-        # Prepend node + pnpm bin to PATH so expo prebuild's app/build.gradle
-        # can resolve paths via \`node\` and the pnpm-managed bins. The env:
-        # section does NOT expand $PATH, so we have to do it in the shell.
-        run: |
-          export PATH="/home/runner/.nvm/versions/node/v20.20.2/bin:/home/runner/setup-pnpm/node_modules/.bin:$PATH"
-          which node
-          ./gradlew assembleRelease
+        run: ./gradlew assembleRelease
 
       - name: Locate APK
         id: locate
